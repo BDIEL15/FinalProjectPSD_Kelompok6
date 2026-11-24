@@ -15,7 +15,7 @@ Kerjakan berurutan. Kalau A belum tampil, B dan M4 juga tidak akan tampil.
 1. **Vivado 2026.1**, centang **Vitis** dan device **Zynq-7000**. Versi ini dipakai semua anggota: `2026.1`.
 2. **Board file Digilent** (wajib untuk M4, berisi preset ARM Zybo: DDR, UART, clock):
    salin isi `new/board_files` dari <https://github.com/Digilent/vivado-boards> ke `<Vivado>/data/boards/board_files/`.
-3. **Cek pin XDC.** Pin di [constr/zybo_z7_hdmi.xdc](constr/zybo_z7_hdmi.xdc) **ditulis dari ingatan**. Cocokkan setiap baris dengan `Zybo-Z7-Master.xdc` dari <https://github.com/Digilent/digilent-xdc> sebelum bitstream pertama.
+3. **Pin XDC** di [constr/zybo_z7_hdmi.xdc](constr/zybo_z7_hdmi.xdc) sudah dicocokkan dengan `Zybo-Z7-Master.xdc` Digilent (22 port cocok). Cocokkan ulang bila menambah port baru.
 4. **Simulasi harus lulus dulu** (cukup GHDL + gcc, tanpa Vivado):
 
 ```powershell

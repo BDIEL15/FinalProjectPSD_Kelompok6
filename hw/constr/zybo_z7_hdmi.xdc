@@ -2,10 +2,10 @@
 ##   top_hdmi_test, top_render_test, dan system_wrapper (block design)
 ## Nama port di ketiganya sama: sysclk, sw, btn, led, hdmi_tx_*.
 ##
-## !!! WAJIB DICEK ULANG sebelum sintesis !!!
-## Nomor pin di bawah ditulis dari ingatan, berdasarkan Digilent Zybo-Z7-Master.xdc.
-## Bandingkan setiap baris dengan file master resmi:
-##   https://github.com/Digilent/digilent-xdc  ->  Zybo-Z7-Master.xdc
+## Pin sudah dicocokkan dengan Digilent Zybo-Z7-Master.xdc (24 Nov 2026):
+## 22 port (sysclk, sw, btn, led, HDMI TX) cocok persis, termasuk IOSTANDARD.
+## Sumber: https://github.com/Digilent/digilent-xdc  ->  Zybo-Z7-Master.xdc
+## Pin audio dan lainnya belum dipakai. Tambahkan dari file master bila perlu.
 ## Port HDMI yang dipakai adalah konektor "HDMI TX" (J8, sisi sumber/source).
 
 ## Clock 125 MHz
