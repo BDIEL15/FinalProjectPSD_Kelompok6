@@ -35,3 +35,5 @@ sw/vitis_ws/
 *.backup.jou
 *.backup.log
 sim/out/
+sw/game/board_sim
+sw/game/board_sim.exe

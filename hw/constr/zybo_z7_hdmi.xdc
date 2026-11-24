@@ -1,4 +1,6 @@
-## zybo_z7_hdmi.xdc -- constraint untuk top_hdmi_test (Zybo Z7-10 / Z7-20)
+## zybo_z7_hdmi.xdc -- constraint Zybo Z7-10 / Z7-20 untuk semua top:
+##   top_hdmi_test, top_render_test, dan system_wrapper (block design)
+## Nama port di ketiganya sama: sysclk, sw, btn, led, hdmi_tx_*.
 ##
 ## !!! WAJIB DICEK ULANG sebelum sintesis !!!
 ## Nomor pin di bawah ditulis dari ingatan, berdasarkan Digilent Zybo-Z7-Master.xdc.
