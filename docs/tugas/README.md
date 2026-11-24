@@ -67,7 +67,7 @@ flowchart LR
 | 0x04 | `STATUS` | [0] in_vblank, [1] commit_pending, [31:16] frame_count | Hanya baca |
 | 0x08 | `BIRD_POS` **S** | [9:0] x, [25:16] y | Piksel, kiri-atas sprite 32×32 |
 | 0x0C | `BIRD_ATTR` **S** | [1:0] frame animasi, [2] visible, [3] flash | |
-| 0x10–0x1C | `PIPE0..3` **S** | [10:0] x signed, [20:12] gap_y, [31] visible | C mengirim visible=0 bila pipa di luar −68..639 |
+| 0x10–0x1C | `PIPE0..3` **S** | [10:0] x signed, [20:12] gap_y, [31] visible | visible=1 hanya bila `−(width+4) < x < 644` (ada bagian tutup di layar). Wajib, karena pipa baru muncul di x ≈ 1640 yang tidak muat 11 bit |
 | 0x20 | `PIPE_CFG` **S** | [8:0] gap_h, [15:9] width | |
 | 0x24 | `SCROLL_X` **S** | [9:0] | Pergeseran lantai |
 | 0x28 | `SCORE` **S** | [15:0] BCD, 4 digit | PS mengonversi skor biner ke BCD sebelum menulis |
@@ -81,6 +81,8 @@ flowchart LR
 Catatan:
 - **`SCORE` dikirim sebagai BCD** (4 digit × 4 bit), supaya E tidak perlu pembagi di hardware.
 - **Konstanta layar** (sama dengan `tools/game_model.py`): 640×480, lantai mulai y=416, burung 32×32 di x=160, tutup pipa tinggi 20 dan lebih lebar 4 px tiap sisi.
+- **Implementasi kontrak ini (harus selalu sama):** [`sw/game/regs.h`](../../sw/game/regs.h) (sisi C), [`hw/vhdl/system/gfx_pkg.vhd`](../../hw/vhdl/system/gfx_pkg.vhd) (sisi VHDL, draf), dan [`tools/ref_render.py`](../../tools/ref_render.py) (aturan gambar per piksel + indeks palet). `mingw32-make -C sw/game check` menguji C dan `ref_render.py` terhadap model Python.
+- **Palet default** (indeks): 0 transparan, 1–5 burung (garis, badan, paruh, mata, sayap), 6–8 pipa (badan, terang, gelap), 9–11 lantai, 12 bayangan teks, 13 cadangan, **14 dasar langit**, 15 teks. Langit = `PALETTE[14]` + offset per pita 8 baris, jadi mengganti satu register sudah mengubah suasana (mis. mode malam).
 
 ### 3.2 Antarmuka renderer (D ↔ E), paket VHDL `gfx_pkg.vhd`
 - **Pemilik paket:** D yang membuat `gfx_pkg.vhd` (record `gfx_regs_t` berisi semua register aktif di atas) pada H2, lalu disetujui E.

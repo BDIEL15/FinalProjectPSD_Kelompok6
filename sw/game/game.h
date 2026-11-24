@@ -66,7 +66,13 @@ typedef struct {
     int32_t last_flap_frame;
     int32_t flap_due[FLAP_QUEUE_LEN];   /* frame jatuh tempo flap tertunda */
     int flap_count;
+    uint32_t events;      /* GAME_EV_* yang terjadi pada game_step terakhir */
 } game_t;
+
+/* Kejadian satu langkah, untuk efek suara (SFX_TRIGGER). */
+#define GAME_EV_FLAP   (1u << 0)
+#define GAME_EV_SCORE  (1u << 1)
+#define GAME_EV_HIT    (1u << 2)
 
 void game_init(game_t *g, const game_params_t *p);
 void game_reset_to_menu(game_t *g);

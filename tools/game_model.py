@@ -431,6 +431,7 @@ PIPE_DARK = (30, 80, 30)
 GROUND_TOP = (90, 180, 60)
 GROUND_A = (222, 200, 120)
 GROUND_B = (204, 180, 100)
+SKY_BASE = (90, 160, 230)       # PALETTE[14]
 
 
 def bird_art_frame(i):
@@ -441,6 +442,69 @@ def bird_art_frame(i):
             if ch != ".":
                 rows[top + dy][1 + dx] = ch
     return ["".join(r) for r in rows]
+
+
+def sky_color(y):
+    """Warna langit per pita 8 baris: PALETTE[14] + offset, dijenuhkan ke 255.
+    Rumus ini aturan hardware (lihat tools/ref_render.py), bukan hanya gaya."""
+    b = y >> 3
+    r0, g0, b0 = SKY_BASE
+    return (min(255, r0 + 2 * b), min(255, g0 + b + (b >> 2)), min(255, b0 + (b >> 1)))
+
+
+def build_art(pygame):
+    """Surface yang dipakai draw_world: 4 frame burung, langit, lantai."""
+    bird_frames = []
+    for i in range(4):
+        s = pygame.Surface((16, 16), pygame.SRCALPHA)
+        for y, row in enumerate(bird_art_frame(i)):
+            for x, ch in enumerate(row):
+                if ch in ART_COLORS:
+                    s.set_at((x, y), ART_COLORS[ch])
+        bird_frames.append(pygame.transform.scale(s, (BIRD_SIZE, BIRD_SIZE)))
+
+    sky = pygame.Surface((SCREEN_W, GROUND_Y))
+    for y in range(0, GROUND_Y, 8):
+        sky.fill(sky_color(y), (0, y, SCREEN_W, 8))
+
+    # Lantai: garis diagonal periode 32 px, digeser oleh scroll
+    ground = pygame.Surface((SCREEN_W + 32, SCREEN_H - GROUND_Y))
+    for y in range(ground.get_height()):
+        for x in range(ground.get_width()):
+            if y < 8:
+                c = GROUND_TOP
+            else:
+                c = GROUND_A if ((x + y) // 16) % 2 == 0 else GROUND_B
+            ground.set_at((x, y), c)
+    return {"bird": bird_frames, "sky": sky, "ground": ground}
+
+
+def draw_world(screen, game, art):
+    """Gambar semua layer kecuali teks, urutan = prioritas engine PL
+    (belakang -> depan). Harus sama piksel demi piksel dengan
+    tools/ref_render.py (diuji tools/render_check.py)."""
+    import pygame
+    screen.blit(art["sky"], (0, 0))
+    w = game.p["pipe_width"]
+    gh = game.p["gap_h"]
+    for pipe in game.pipes:
+        px = pipe.x // FP
+        if px > SCREEN_W or px + w < -PIPE_CAP_EXTRA:
+            continue
+        for top, bot in ((0, pipe.gap_y), (pipe.gap_y + gh, GROUND_Y)):
+            if bot <= top:
+                continue
+            pygame.draw.rect(screen, PIPE_BODY, (px, top, w, bot - top))
+            pygame.draw.rect(screen, PIPE_LIGHT, (px + 6, top, 8, bot - top))
+            pygame.draw.rect(screen, PIPE_DARK, (px, top, w, bot - top), 2)
+        for cy in (pipe.gap_y - PIPE_CAP_H, pipe.gap_y + gh):
+            cap = (px - PIPE_CAP_EXTRA, cy, w + 2 * PIPE_CAP_EXTRA, PIPE_CAP_H)
+            pygame.draw.rect(screen, PIPE_BODY, cap)
+            pygame.draw.rect(screen, PIPE_DARK, cap, 2)
+    screen.blit(art["ground"], (-((game.scroll // FP) % 32), GROUND_Y))
+
+    anim = (game.frame // 6) % 4 if game.state != GAME_OVER else 1
+    screen.blit(art["bird"][anim], (game.p["bird_x"], game.bird_y // FP))
 
 
 def run_game(params, config_path, bpm, show_overlay):
@@ -454,32 +518,7 @@ def run_game(params, config_path, bpm, show_overlay):
     font_mid = pygame.font.Font(None, 40)
     font_small = pygame.font.Font(None, 22)
 
-    # Sprite burung: 4 frame, 16x16 -> 32x32
-    bird_frames = []
-    for i in range(4):
-        s = pygame.Surface((16, 16), pygame.SRCALPHA)
-        for y, row in enumerate(bird_art_frame(i)):
-            for x, ch in enumerate(row):
-                if ch in ART_COLORS:
-                    s.set_at((x, y), ART_COLORS[ch])
-        bird_frames.append(pygame.transform.scale(s, (BIRD_SIZE, BIRD_SIZE)))
-
-    # Langit: gradien per pita 8 baris (PL cukup ganti warna per pita)
-    sky = pygame.Surface((SCREEN_W, GROUND_Y))
-    for y in range(0, GROUND_Y, 8):
-        t = y / GROUND_Y
-        c = (int(90 + 100 * t), int(160 + 65 * t), int(230 + 20 * t))
-        sky.fill(c, (0, y, SCREEN_W, 8))
-
-    # Lantai: garis diagonal periode 32 px, digeser oleh scroll
-    ground = pygame.Surface((SCREEN_W + 32, SCREEN_H - GROUND_Y))
-    for y in range(ground.get_height()):
-        for x in range(ground.get_width()):
-            if y < 8:
-                c = GROUND_TOP
-            else:
-                c = GROUND_A if ((x + y) // 16) % 2 == 0 else GROUND_B
-            ground.set_at((x, y), c)
+    art = build_art(pygame)
 
     beep = None
     try:
@@ -533,28 +572,7 @@ def run_game(params, config_path, bpm, show_overlay):
             best = max(best, game.score)
             print(f"game over: skor={game.score} terbaik={best}")
 
-        # ---- render, urutan layer = prioritas engine PL (belakang -> depan)
-        screen.blit(sky, (0, 0))
-        w = game.p["pipe_width"]
-        gh = game.p["gap_h"]
-        for pipe in game.pipes:
-            px = pipe.x // FP
-            if px > SCREEN_W or px + w < -PIPE_CAP_EXTRA:
-                continue
-            for top, bot in ((0, pipe.gap_y), (pipe.gap_y + gh, GROUND_Y)):
-                if bot <= top:
-                    continue
-                pygame.draw.rect(screen, PIPE_BODY, (px, top, w, bot - top))
-                pygame.draw.rect(screen, PIPE_LIGHT, (px + 6, top, 8, bot - top))
-                pygame.draw.rect(screen, PIPE_DARK, (px, top, w, bot - top), 2)
-            for cy in (pipe.gap_y - PIPE_CAP_H, pipe.gap_y + gh):
-                cap = (px - PIPE_CAP_EXTRA, cy, w + 2 * PIPE_CAP_EXTRA, PIPE_CAP_H)
-                pygame.draw.rect(screen, PIPE_BODY, cap)
-                pygame.draw.rect(screen, PIPE_DARK, cap, 2)
-        screen.blit(ground, (-((game.scroll // FP) % 32), GROUND_Y))
-
-        anim = (game.frame // 6) % 4 if game.state != GAME_OVER else 1
-        screen.blit(bird_frames[anim], (game.p["bird_x"], game.bird_y // FP))
+        draw_world(screen, game, art)
 
         def center_text(font, text, y, color=(255, 255, 255)):
             shadow = font.render(text, True, (0, 0, 0))

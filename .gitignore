@@ -24,3 +24,6 @@ __pycache__/
 sw/game/game_trace
 sw/game/game_trace.exe
 *.o
+sw/game/game_regs
+sw/game/game_regs.exe
+sw/game/out/

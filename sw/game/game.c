@@ -64,6 +64,7 @@ void game_init(game_t *g, const game_params_t *p)
     g->frame = 0;
     g->scroll = 0;
     g->last_flap_frame = -1000000000;
+    g->events = 0;
     game_reset_to_menu(g);
 }
 
@@ -123,6 +124,7 @@ static void fall(game_t *g)
 void game_step(game_t *g)
 {
     bool flap = take_flap(g);
+    g->events = 0;
     g->frame++;
     g->state_frame++;
 
@@ -161,8 +163,10 @@ void game_step(game_t *g)
     }
 
     /* ---- PLAY ---- */
-    if (flap)
+    if (flap) {
         g->bird_vy = -g->p.flap_velocity_fp;
+        g->events |= GAME_EV_FLAP;
+    }
     fall(g);
     g->bird_y += g->bird_vy;
     if (g->bird_y < 0) {
@@ -190,11 +194,14 @@ void game_step(game_t *g)
         if (!q->scored && fdiv(q->x, FP) + w / 2 < bird_center) {
             q->scored = true;
             g->score++;
+            g->events |= GAME_EV_SCORE;
         }
     }
 
-    if (collides(g))
+    if (collides(g)) {
         set_state(g, ST_GAME_OVER);
+        g->events |= GAME_EV_HIT;
+    }
 }
 
 const pipe_t *game_next_pipe(const game_t *g)
