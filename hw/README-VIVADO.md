@@ -28,7 +28,26 @@ powershell -ExecutionPolicy Bypass -File sim/run_vhdl.ps1
 
 Keduanya harus diakhiri `PASS`. Simulasi membuktikan logika dan gambar. Yang **tidak** bisa dibuktikan simulasi: primitif Xilinx (MMCM, OSERDES), pin, dan monitor. Itulah yang diuji di board.
 
-Perintah `vivado`, `vitis`, dan `xsdb` ada di folder `bin` Vivado/Vitis. Jalankan dari "Vivado 2026.1 Tcl Shell" / "Vitis 2026.1 Command Prompt", atau tambahkan folder itu ke PATH.
+Perintah `vivado`, `vitis`, dan `xsdb` ada di folder `bin` Vivado/Vitis. Di PowerShell, atur PATH sekali per jendela (jangan klik file `.bat`/`.tcl` langsung; Windows akan menanyakan "buka dengan apa"):
+
+```powershell
+$env:Path = "C:\AMDDesignTools6.1\Vivadoin;C:\AMDDesignTools6.1\Vitisin;$env:Path"
+```
+
+(`C:\AMDDesignTools` adalah lokasi instalasi di laptop kelompok; sesuaikan bila berbeda.)
+
+## Membuka di GUI Vivado (opsional)
+
+Skrip `build_*.tcl` berjalan di terminal tanpa jendela. Untuk melihat/mengedit di GUI:
+
+| Tujuan | Perintah |
+|---|---|
+| Proyek tahap A (pola uji HDMI) | `vivado -mode gui -source hw/scripts/open_project.tcl -tclargs hdmi_test` |
+| Proyek tahap B (renderer game) | `vivado -mode gui -source hw/scripts/open_project.tcl -tclargs render_test` |
+| Proyek M4 (block design + ARM), setelah `build_system.tcl` pernah jalan | `vivado hw/out/system/proj/system.xpr` |
+| Memprogram board saja | `vivado`, lalu **Open Hardware Manager** (tanpa proyek) |
+
+`open_project.tcl` hanya membuat proyek (sumber, XDC, top), tanpa build. Setelah GUI terbuka, klik **Run Synthesis → Run Implementation → Generate Bitstream** di Flow Navigator, atau lihat schematic lewat **Open Elaborated Design**. File VHDL **tidak disalin**: proyek menunjuk langsung ke `hw/vhdl/`, jadi edit di GUI = edit di repo. Proyek ada di `hw/out/gui_*/` (diabaikan git, aman dihapus). Perubahan koneksi block design lewat klik tidak ikut git; masukkan ke `hw/scripts/build_system.tcl`.
 
 ## Tahap A: pola uji HDMI (tanpa ARM)
 
