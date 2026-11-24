@@ -27,3 +27,11 @@ sw/game/game_trace.exe
 sw/game/game_regs
 sw/game/game_regs.exe
 sw/game/out/
+
+# Vivado / Vitis (hasil build skrip)
+hw/out/
+sw/vitis_ws/
+.Xil/
+*.backup.jou
+*.backup.log
+sim/out/
