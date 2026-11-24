@@ -2,10 +2,18 @@
  * dibuat sama agar uji jejak identik. */
 #include "game.h"
 
-#include <math.h>
 #include <stddef.h>
 
 #define BIRD_CENTER_Y ((GROUND_Y / 2 - BIRD_SIZE / 2) * FP)
+
+/* Offset burung di MENU: segitiga -6..+6 px, periode 128 frame (= menu_hover
+ * di game_model.py). Integer murni, jadi tidak butuh libm di board. */
+static int32_t menu_hover(int32_t frame)
+{
+    int32_t phase = frame % 128;
+    int32_t t = phase < 64 ? phase : 128 - phase;
+    return (t - 32) * (6 * FP / 32);
+}
 
 static int32_t min32(int32_t a, int32_t b) { return a < b ? a : b; }
 static int32_t max32(int32_t a, int32_t b) { return a > b ? a : b; }
@@ -132,8 +140,8 @@ void game_step(game_t *g)
         g->scroll = (g->scroll + g->p.pipe_speed_fp) % (10000 * FP);
 
     if (g->state == ST_MENU) {
-        /* Mengambang naik-turun; hanya tampilan, di-snap saat start. */
-        g->bird_y = BIRD_CENTER_Y + (int32_t)(6.0 * FP * sin(g->frame / 20.0));
+        /* Mengambang naik-turun; mulai main selalu dari tengah. */
+        g->bird_y = BIRD_CENTER_Y + menu_hover(g->frame);
         if (flap) {
             g->bird_y = BIRD_CENTER_Y;
             set_state(g, ST_COUNTDOWN);

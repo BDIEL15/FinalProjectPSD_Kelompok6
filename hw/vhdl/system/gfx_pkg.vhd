@@ -23,7 +23,7 @@ package gfx_pkg is
 
     -- Offset register (byte)
     constant REG_CTRL        : natural := 16#00#;
-    constant REG_STATUS      : natural := 16#04#;
+    constant REG_STATUS      : natural := 16#04#;   -- [0] in_vblank [1] commit_pending [7:4] btn [11:8] sw [31:16] frame_count
     constant REG_BIRD_POS    : natural := 16#08#;
     constant REG_BIRD_ATTR   : natural := 16#0C#;
     constant REG_PIPE0       : natural := 16#10#;   -- PIPE(i) = REG_PIPE0 + 4*i

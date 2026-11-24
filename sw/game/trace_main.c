@@ -45,12 +45,8 @@ int main(int argc, char **argv)
         }
         game_step(&g);
 
-        printf("%d,%d,%d,", g.frame, (int)g.state, g.state_frame);
-        if (g.state == ST_MENU)
-            printf("-,");
-        else
-            printf("%d,", g.bird_y);
-        printf("%d,%d,%d", g.bird_vy, g.score, g.scroll);
+        printf("%d,%d,%d,%d,%d,%d,%d", g.frame, (int)g.state, g.state_frame,
+               g.bird_y, g.bird_vy, g.score, g.scroll);
         for (int k = 0; k < PIPE_SLOTS; k++)
             printf(",%d,%d,%d", g.pipes[k].x, g.pipes[k].gap_y, g.pipes[k].scored ? 1 : 0);
         printf("\n");

@@ -88,6 +88,13 @@ COUNTDOWN_FRAMES = 3 * FPS
 GAME_OVER_LOCK_FRAMES = FPS // 2
 
 
+def menu_hover(frame):
+    """Offset fixed-point burung di MENU: segitiga -6..+6 px, periode 128 frame."""
+    phase = frame % 128
+    t = phase if phase < 64 else 128 - phase          # 0..64
+    return (t - 32) * (6 * FP // 32)
+
+
 class Rng:
     """LCG 31-bit; mudah ditulis ulang identik di C."""
 
@@ -200,12 +207,11 @@ class Game:
             self.scroll = (self.scroll + self._fp("pipe_speed")) % (10_000 * FP)
 
         if self.state == MENU:
-            # burung mengambang naik-turun
-            self.bird_y = (GROUND_Y // 2 - BIRD_SIZE // 2) * FP + int(
-                6 * FP * math.sin(self.frame / 20))
+            # burung mengambang naik-turun (gelombang segitiga integer, +-6 px,
+            # periode 128 frame; tanpa sin agar identik dengan C tanpa libm)
+            self.bird_y = (GROUND_Y // 2 - BIRD_SIZE // 2) * FP + menu_hover(self.frame)
             if flap:
-                # snap ke tengah: nilai sin bisa beda 1 unit antar-libm,
-                # jadi tidak boleh terbawa ke PLAY (uji jejak Python vs C)
+                # mulai selalu dari tengah
                 self.bird_y = (GROUND_Y // 2 - BIRD_SIZE // 2) * FP
                 self._set_state(COUNTDOWN)
             return
@@ -354,9 +360,7 @@ TRACE_MIN_INTERVAL_MS = 600
 
 def trace_row(g):
     """Satu baris CSV; format harus sama persis dengan sw/game/trace_main.c."""
-    # bird_y saat MENU memakai sin (bisa beda antar-libm), jadi tidak dicatat
-    by = "-" if g.state == MENU else str(g.bird_y)
-    cols = [g.frame, STATE_ID[g.state], g.state_frame, by, g.bird_vy, g.score, g.scroll]
+    cols = [g.frame, STATE_ID[g.state], g.state_frame, g.bird_y, g.bird_vy, g.score, g.scroll]
     for q in g.pipes:
         cols += [q.x, q.gap_y, int(q.scored)]
     return ",".join(str(c) for c in cols)

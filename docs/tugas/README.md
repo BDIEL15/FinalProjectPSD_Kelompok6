@@ -64,7 +64,7 @@ flowchart LR
 | Offset | Nama | Bit | Keterangan |
 |---|---|---|---|
 | 0x00 | `CTRL` | [0] enable, [1] test_pattern, [2] commit (self-clear) | |
-| 0x04 | `STATUS` | [0] in_vblank, [1] commit_pending, [31:16] frame_count | Hanya baca |
+| 0x04 | `STATUS` | [0] in_vblank, [1] commit_pending, [7:4] tombol BTN0–3, [11:8] switch SW0–3, [31:16] frame_count | Hanya baca. Tombol/switch disinkronkan di PL, jadi game tidak perlu IP GPIO |
 | 0x08 | `BIRD_POS` **S** | [9:0] x, [25:16] y | Piksel, kiri-atas sprite 32×32 |
 | 0x0C | `BIRD_ATTR` **S** | [1:0] frame animasi, [2] visible, [3] flash | |
 | 0x10–0x1C | `PIPE0..3` **S** | [10:0] x signed, [20:12] gap_y, [31] visible | visible=1 hanya bila `−(width+4) < x < 644` (ada bagian tutup di layar). Wajib, karena pipa baru muncul di x ≈ 1640 yang tidak muat 11 bit |

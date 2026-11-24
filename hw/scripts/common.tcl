@@ -22,7 +22,8 @@ proc system_sources {top} {
             lappend files {*}[render_sources] [file join $ren top_render_test.vhd]
         }
         gfx_top {
-            lappend files {*}[render_sources] [file join $sys gfx_axi_regs.vhd] [file join $sys gfx_top.vhd]
+            lappend files [file join $sys test_pattern.vhd] {*}[render_sources] \
+                [file join $sys gfx_axi_regs.vhd] [file join $sys gfx_top.vhd]
         }
         default { error "top tidak dikenal: $top" }
     }

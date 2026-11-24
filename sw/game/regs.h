@@ -12,7 +12,7 @@
 #include <stdint.h>
 
 #define REG_CTRL         0x00u   /* [0] enable [1] test_pattern [2] commit (self-clear) */
-#define REG_STATUS       0x04u   /* RO: [0] in_vblank [1] commit_pending [31:16] frame_count */
+#define REG_STATUS       0x04u   /* RO: [0] in_vblank [1] commit_pending [7:4] btn [11:8] sw [31:16] frame_count */
 #define REG_BIRD_POS     0x08u   /* S: [9:0] x  [25:16] y  (kiri-atas sprite 32x32) */
 #define REG_BIRD_ATTR    0x0Cu   /* S: [1:0] frame animasi [2] visible [3] flash */
 #define REG_PIPE(i)      (0x10u + 4u * (unsigned)(i))  /* S: [10:0] x signed [20:12] gap_y [31] visible */
@@ -36,6 +36,9 @@
 
 #define STATUS_IN_VBLANK       (1u << 0)
 #define STATUS_COMMIT_PENDING  (1u << 1)
+#define STATUS_BTN(v)          (((v) >> 4) & 0xFu)    /* tombol BTN0..3 */
+#define STATUS_SW(v)           (((v) >> 8) & 0xFu)    /* switch SW0..3 */
+#define STATUS_FRAME(v)        (((v) >> 16) & 0xFFFFu)
 
 #define BIRD_ATTR_VISIBLE  (1u << 2)
 #define BIRD_ATTR_FLASH    (1u << 3)
