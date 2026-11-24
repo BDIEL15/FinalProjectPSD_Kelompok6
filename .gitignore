@@ -37,3 +37,4 @@ sw/vitis_ws/
 sim/out/
 sw/game/board_sim
 sw/game/board_sim.exe
+nlviewcommon.logfile

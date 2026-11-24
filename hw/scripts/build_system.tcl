@@ -4,13 +4,21 @@
 #
 # Block design dibuat seluruhnya dari skrip ini (tidak ada klik manual):
 #
+#   sysclk 125 MHz --> [Clocking Wizard] --clk_out1 25 MHz--> semua clock AXI + gfx_top
+#                            |  clk_out2 125 MHz (5x) --> gfx_top (serializer HDMI)
+#                            |  locked --> proc_sys_reset + gfx_top
 #   [ZYNQ7 PS] --M_AXI_GP0--> [AXI Interconnect] --> [gfx_top (VHDL, module reference)]
-#        |  FCLK_RESET0_N                                   |  pix_clk_o (25 MHz)
-#        +--> [proc_sys_reset] <-- dcm_locked = locked_o     +--> semua clock AXI
+#        |  FCLK_RESET0_N
+#        +--> [proc_sys_reset] --> reset AXI
+#
+# Clock dibangkitkan di Clocking Wizard, bukan di dalam gfx_top, agar Vivado tahu
+# frekuensinya dan meneruskannya ke PS7/interconnect. (Diuji: dengan MMCM di
+# dalam gfx_top, validate_bd_design gagal "FREQ_HZ does not match".)
 #
 # Semua logika ada di VHDL (hw/vhdl). Block design hanya kabel.
 # Hasil di hw/out/system/: system_wrapper.bit, system.xsa (untuk Vitis),
-# utilization.txt, timing.txt, dan system_bd.pdf/.tcl (diagram untuk laporan).
+# utilization.txt, timing.txt, dan system_bd.tcl. Diagram PDF hanya bisa dibuat dari
+# GUI (write_bd_layout gagal di mode batch).
 #
 # Syarat: board file Digilent terpasang (preset PS7 Zybo Z7: DDR, MIO, UART, ...).
 # Skrip ini ditulis sebelum Vivado 2026.1 tersedia di laptop pengembang:
@@ -59,12 +67,18 @@ apply_bd_automation -rule xilinx.com:bd_rule:processing_system7 \
 set_property -dict [list CONFIG.PCW_USE_M_AXI_GP0 {1}] [get_bd_cells ps7]
 
 create_bd_cell -type module -reference gfx_top gfx
+create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz clk_gen
+set_property -dict [list \
+    CONFIG.PRIM_IN_FREQ {125.000} \
+    CONFIG.CLKOUT1_USED {true} CONFIG.CLKOUT1_REQUESTED_OUT_FREQ {25.000} \
+    CONFIG.CLKOUT2_USED {true} CONFIG.CLKOUT2_REQUESTED_OUT_FREQ {125.000} \
+    CONFIG.USE_RESET {false} CONFIG.USE_LOCKED {true}] [get_bd_cells clk_gen]
 create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset rst_gfx
 create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect axi_ic
 set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {1}] [get_bd_cells axi_ic]
 
-# clock: satu clock piksel untuk AXI dan video
-connect_bd_net [get_bd_pins gfx/pix_clk_o] \
+# clock: satu clock piksel 25 MHz untuk AXI dan video; 125 MHz hanya untuk serializer
+connect_bd_net [get_bd_pins clk_gen/clk_out1] \
     [get_bd_pins gfx/s_axi_aclk] \
     [get_bd_pins ps7/M_AXI_GP0_ACLK] \
     [get_bd_pins axi_ic/ACLK] [get_bd_pins axi_ic/S00_ACLK] [get_bd_pins axi_ic/M00_ACLK] \
@@ -72,7 +86,8 @@ connect_bd_net [get_bd_pins gfx/pix_clk_o] \
 
 # reset
 connect_bd_net [get_bd_pins ps7/FCLK_RESET0_N] [get_bd_pins rst_gfx/ext_reset_in]
-connect_bd_net [get_bd_pins gfx/locked_o] [get_bd_pins rst_gfx/dcm_locked]
+connect_bd_net [get_bd_pins clk_gen/clk_out2] [get_bd_pins gfx/ser_clk]
+connect_bd_net [get_bd_pins clk_gen/locked] [get_bd_pins rst_gfx/dcm_locked] [get_bd_pins gfx/pll_locked]
 connect_bd_net [get_bd_pins rst_gfx/interconnect_aresetn] [get_bd_pins axi_ic/ARESETN]
 connect_bd_net [get_bd_pins rst_gfx/peripheral_aresetn] \
     [get_bd_pins axi_ic/S00_ARESETN] [get_bd_pins axi_ic/M00_ARESETN] [get_bd_pins gfx/s_axi_aresetn]
@@ -83,17 +98,21 @@ connect_bd_intf_net [get_bd_intf_pins axi_ic/M00_AXI] [get_bd_intf_pins gfx/s_ax
 
 # pin board: nama port = nama di hw/constr/zybo_z7_hdmi.xdc
 create_bd_port -dir I -type clk -freq_hz 125000000 sysclk
-connect_bd_net [get_bd_ports sysclk] [get_bd_pins gfx/sysclk]
-foreach {name dir width} {
-    btn I 4  sw I 4  led O 4
-    hdmi_tx_hpd I 1  hdmi_tx_clk_p O 1  hdmi_tx_clk_n O 1  hdmi_tx_p O 3  hdmi_tx_n O 3
+connect_bd_net [get_bd_ports sysclk] [get_bd_pins clk_gen/clk_in1]
+# {port board, pin gfx_top, arah, lebar}; pin TMDS gfx_top tanpa "clk" di nama
+# supaya tidak disangka antarmuka clock oleh Vivado.
+foreach {name pin dir width} {
+    btn btn I 4  sw sw I 4  led led O 4
+    hdmi_tx_hpd hdmi_tx_hpd I 1
+    hdmi_tx_clk_p tmds_ck_p O 1  hdmi_tx_clk_n tmds_ck_n O 1
+    hdmi_tx_p tmds_d_p O 3  hdmi_tx_n tmds_d_n O 3
 } {
     if {$width == 1} {
         create_bd_port -dir $dir $name
     } else {
         create_bd_port -dir $dir -from [expr {$width - 1}] -to 0 $name
     }
-    connect_bd_net [get_bd_ports $name] [get_bd_pins gfx/$name]
+    connect_bd_net [get_bd_ports $name] [get_bd_pins gfx/$pin]
 }
 
 # alamat: register grafis di 0x43C0_0000 (sama dengan GFX_BASE di sw/platform)

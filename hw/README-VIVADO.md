@@ -88,7 +88,7 @@ Program `hw/out/render_test/top_render_test.bit` seperti tahap A. Yang harus ter
 
 ## M4: game dimainkan dengan tombol
 
-1. **Hardware** (bitstream + `system.xsa`, juga `system_bd.pdf` untuk laporan):
+1. **Hardware** (bitstream + `system.xsa`). Clock 25/125 MHz dibuat IP Clocking Wizard di block design, bukan di dalam `gfx_top`:
 
 ```powershell
 vivado -mode batch -source hw/scripts/build_system.tcl
@@ -140,4 +140,4 @@ Setelah mengubah kode C, jalankan ulang langkah 2 dan 3. Langkah 1 hanya perlu d
 | Pola uji tetap tampil, game tidak | Program C tidak menulis `CTRL.enable`: cek konsol serial, LED3 harus berkedip |
 | `build_system.tcl` error di nama perintah/properti | Skrip ditulis sebelum Vivado 2026.1 tersedia; perbaiki baris itu di skrip (bukan lewat GUI), lalu catat perubahannya |
 
-Simpan foto/video setiap tahap ke `docs/bukti/D/` dan `docs/bukti/E/` untuk laporan, bersama `utilization.txt`, `timing.txt`, dan `system_bd.pdf`.
+Simpan foto/video setiap tahap ke `docs/bukti/D/` dan `docs/bukti/E/` untuk laporan, bersama `utilization.txt` dan `timing.txt`. Diagram block design untuk laporan: buka `hw/out/system/proj/system.xpr` di GUI, buka block design `system`, lalu klik kanan di kanvas → **Save as PDF File**.
