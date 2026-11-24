@@ -1,0 +1,21 @@
+# Vivado
+*.cache/
+*.runs/
+*.sim/
+*.hw/
+*.ip_user_files/
+*.gen/
+.Xil/
+*.jou
+*.log
+*.str
+vivado_proj/
+
+# Simulasi
+sim/out/
+*.vvp
+*.vcd
+
+# Python
+__pycache__/
+*.pyc
