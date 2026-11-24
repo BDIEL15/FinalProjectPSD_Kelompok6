@@ -14,6 +14,7 @@ Pemakaian:
   python tools/game_model.py --bpm 70        metronom ritme lompatan
   python tools/game_model.py --latency 100   tunda flap 100 ms (latensi kamera)
   python tools/game_model.py --selftest      uji logika tanpa jendela
+  python tools/trace_compare.py              uji jejak Python vs C (sw/game/)
 """
 
 import argparse
@@ -111,7 +112,7 @@ class Game:
     def __init__(self, params):
         self.p = params
         self.frame = 0            # penghitung frame global (animasi, lantai)
-        self.scroll = 0           # piksel, untuk lantai
+        self.scroll = 0           # fixed-point, untuk lantai (SCROLL_X = scroll // FP)
         self.events = []          # flap tertunda: frame jatuh tempo
         self.last_flap_frame = -10**9
         self.reset_to_menu()
@@ -196,13 +197,16 @@ class Game:
         self.state_frame += 1
 
         if self.state != GAME_OVER:
-            self.scroll = (self.scroll + self.p["pipe_speed"]) % 10_000
+            self.scroll = (self.scroll + self._fp("pipe_speed")) % (10_000 * FP)
 
         if self.state == MENU:
             # burung mengambang naik-turun
             self.bird_y = (GROUND_Y // 2 - BIRD_SIZE // 2) * FP + int(
                 6 * FP * math.sin(self.frame / 20))
             if flap:
+                # snap ke tengah: nilai sin bisa beda 1 unit antar-libm,
+                # jadi tidak boleh terbawa ke PLAY (uji jejak Python vs C)
+                self.bird_y = (GROUND_Y // 2 - BIRD_SIZE // 2) * FP
                 self._set_state(COUNTDOWN)
             return
 
@@ -338,6 +342,60 @@ def selftest(params):
 
     print("SELFTEST", "PASS" if ok else "FAIL")
     return 0 if ok else 1
+
+
+# ---------------------------------------------------------------------------
+# Uji jejak (trace): acuan untuk versi C di sw/game/
+# ---------------------------------------------------------------------------
+STATE_ID = {MENU: 0, COUNTDOWN: 1, PLAY: 2, GAME_OVER: 3}
+TRACE_LATENCY_MS = 100
+TRACE_MIN_INTERVAL_MS = 600
+
+
+def trace_row(g):
+    """Satu baris CSV; format harus sama persis dengan sw/game/trace_main.c."""
+    # bird_y saat MENU memakai sin (bisa beda antar-libm), jadi tidak dicatat
+    by = "-" if g.state == MENU else str(g.bird_y)
+    cols = [g.frame, STATE_ID[g.state], g.state_frame, by, g.bird_vy, g.score, g.scroll]
+    for q in g.pipes:
+        cols += [q.x, q.gap_y, int(q.scored)]
+    return ",".join(str(c) for c in cols)
+
+
+def trace_policy(g, game_index):
+    """Skenario uji: menu -> main -> game over -> ulang, bergantian
+    autopilot (lolos banyak pipa) dan flap rapat (menabrak atap/pipa)."""
+    if g.state == MENU:
+        return g.state_frame == 30
+    if g.state == GAME_OVER:
+        return g.state_frame == 60
+    if g.state == PLAY:
+        if game_index % 2 == 0:
+            # lolos 8 pipa lalu berhenti flap -> jatuh ke lantai
+            return g.score < 8 and autopilot(g)
+        return g.frame % 9 == 0
+    return False
+
+
+def run_trace(params, frames, trace_path, presses_path):
+    g = Game(dict(params, input_latency_ms=TRACE_LATENCY_MS,
+                  min_flap_interval_ms=TRACE_MIN_INTERVAL_MS))
+    presses, rows, games = [], [], 0
+    for _ in range(frames):
+        if trace_policy(g, games):
+            presses.append(g.frame)
+            g.press()
+        prev = g.state
+        g.step()
+        if prev != GAME_OVER and g.state == GAME_OVER:
+            games += 1
+        rows.append(trace_row(g))
+    with open(presses_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(str(x) for x in presses) + "\n")
+    with open(trace_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(rows) + "\n")
+    print(f"trace: {frames} frame, {len(presses)} tekan, {games} game over")
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -493,7 +551,7 @@ def run_game(params, config_path, bpm, show_overlay):
                 cap = (px - PIPE_CAP_EXTRA, cy, w + 2 * PIPE_CAP_EXTRA, PIPE_CAP_H)
                 pygame.draw.rect(screen, PIPE_BODY, cap)
                 pygame.draw.rect(screen, PIPE_DARK, cap, 2)
-        screen.blit(ground, (-(int(game.scroll) % 32), GROUND_Y))
+        screen.blit(ground, (-((game.scroll // FP) % 32), GROUND_Y))
 
         anim = (game.frame // 6) % 4 if game.state != GAME_OVER else 1
         screen.blit(bird_frames[anim], (game.p["bird_x"], game.bird_y // FP))
@@ -557,6 +615,9 @@ def main():
     ap.add_argument("--latency", type=int, default=None, help="override input_latency_ms")
     ap.add_argument("--min-interval", type=int, default=None, help="override min_flap_interval_ms")
     ap.add_argument("--no-overlay", action="store_true")
+    ap.add_argument("--trace", metavar="CSV", help="tulis jejak per frame (uji vs C), tanpa jendela")
+    ap.add_argument("--presses", metavar="TXT", help="file frame tekan untuk --trace")
+    ap.add_argument("--frames", type=int, default=12000, help="jumlah frame untuk --trace")
     args = ap.parse_args()
 
     config_path = os.path.abspath(args.config)
@@ -568,6 +629,10 @@ def main():
 
     if args.selftest:
         sys.exit(selftest(params))
+    if args.trace:
+        if not args.presses:
+            ap.error("--trace butuh --presses")
+        sys.exit(run_trace(params, args.frames, args.trace, args.presses))
     run_game(params, config_path, args.bpm, not args.no_overlay)
 
 

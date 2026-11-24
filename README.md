@@ -17,7 +17,7 @@ Final project PSD: game bergaya Flappy Bird di Zybo Z7. Kontrolnya lompatan pema
 | `hw/rtl/` | Verilog: timing video, test pattern, top HDMI (nanti: renderer) |
 | `hw/constr/` | Constraint `.xdc` Zybo Z7 |
 | `sim/` | Testbench + skrip simulasi (output ke `sim/out/`, tidak di-commit) |
-| `sw/` | Aplikasi PS (nanti) dan `config.ini` parameter game |
+| `sw/` | Aplikasi PS: `game/` (logika game C) dan `config.ini` parameter game |
 | `tools/` | Model game Python, referensi gambar, pembanding `.ppm` |
 | `assets/` | Gambar sprite asli |
 
@@ -40,6 +40,18 @@ Self-test logika game (headless):
 ```powershell
 python tools/game_model.py --selftest
 ```
+
+Game versi C (`sw/game/`, nanti jalan di ARM) dibuktikan identik dengan model Python lewat uji jejak frame demi frame. Butuh `gcc` + `make` (Windows: MSYS2 `mingw32-make`, Linux/WSL: `make`):
+
+```powershell
+mingw32-make -C sw/game pc
+```
+
+```powershell
+python tools/trace_compare.py
+```
+
+Hasil yang diharapkan: `TRACE IDENTIK` untuk `config.ini` dan variasi parameternya. Bila logika game diubah di `game_model.py`, ubah juga `sw/game/game.c` lalu jalankan uji ini lagi.
 
 Simulasi HDL (tes timing + dump frame test pattern ke `.ppm` + bandingkan dengan referensi Python):
 

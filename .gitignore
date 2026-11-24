@@ -19,3 +19,8 @@ sim/out/
 # Python
 __pycache__/
 *.pyc
+
+# Game C (hasil build)
+sw/game/game_trace
+sw/game/game_trace.exe
+*.o
