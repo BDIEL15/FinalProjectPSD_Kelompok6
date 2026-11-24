@@ -33,6 +33,7 @@ trace: $(TRACE)
 	$(PYTHON) ../../tools/trace_compare.py
 
 check: pc
+	$(PYTHON) ../../tools/gen_vhdl_assets.py --check
 	$(PYTHON) ../../tools/game_model.py --selftest
 	./$(REGS) --selftest
 	$(PYTHON) ../../tools/trace_compare.py

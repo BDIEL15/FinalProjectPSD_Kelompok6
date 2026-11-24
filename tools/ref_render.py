@@ -14,7 +14,15 @@ terakhir.
 
 Aturan per piksel (x, y), prioritas depan -> belakang:
   0. CTRL.enable = 0                     -> hitam
-  1. teks/skor                           -> BELUM (v1 tanpa layer teks)
+  1. teks (font angka 8x16 di tools/assets.py; "lit(c, r)" = bit font menyala):
+       skor   : tampil bila TEXT_ID = 0 (main) atau 5 (game over).
+                n = jumlah digit bermakna SCORE (1..4, nol di depan tidak tampil)
+                kotak x0 = 320 - 8n, y0 = 30, lebar 16n, tinggi 32 (skala 2x)
+                digit ke-k dari kiri = nibble BCD (n-1-k); kolom (cx mod 16)>>1, baris cy>>1
+       hitung : tampil bila COUNTDOWN != 0. Satu digit di x0 = 304, y0 = 160,
+                32x64 (skala 4x); kolom cx>>2, baris cy>>2
+       teks lit di (x, y)           -> PAL 15
+       tidak lit, tapi lit di (x-2, y-2) -> PAL 12 (bayangan)
   2. burung: BIRD_ATTR.visible, bx <= x < bx+32, by <= y < by+32
        idx = BIRD_ART[frame][(y-by)>>1][(x-bx)>>1]; idx 0 = transparan
        BIRD_ATTR.flash -> semua piksel tidak transparan memakai indeks 4
@@ -35,6 +43,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
+import assets as A  # noqa: E402
 import game_model as gm  # noqa: E402
 
 W, H = gm.SCREEN_W, gm.SCREEN_H
@@ -42,15 +51,11 @@ GROUND_Y = gm.GROUND_Y
 REG_COUNT = 32
 
 # Indeks palet (sama dengan PAL_* di sw/game/regs.h)
-PAL_OUTLINE, PAL_BIRD, PAL_BEAK, PAL_EYE, PAL_WING = 1, 2, 3, 4, 5
-PAL_PIPE, PAL_PIPE_LIGHT, PAL_PIPE_DARK = 6, 7, 8
-PAL_GROUND_TOP, PAL_GROUND_A, PAL_GROUND_B = 9, 10, 11
-PAL_SKY_BASE = 14
-ART_INDEX = {"k": PAL_OUTLINE, "y": PAL_BIRD, "o": PAL_BEAK, "w": PAL_EYE, "l": PAL_WING}
-
-# 4 frame x 16 baris x 16 kolom indeks palet (dasar bird.mem untuk BRAM)
-BIRD_IDX = [[[ART_INDEX.get(ch, 0) for ch in row] for row in gm.bird_art_frame(f)]
-            for f in range(4)]
+PAL_EYE = A.PAL_EYE
+PAL_PIPE, PAL_PIPE_LIGHT, PAL_PIPE_DARK = A.PAL_PIPE, A.PAL_PIPE_LIGHT, A.PAL_PIPE_DARK
+PAL_GROUND_TOP, PAL_GROUND_A, PAL_GROUND_B = A.PAL_GROUND_TOP, A.PAL_GROUND_A, A.PAL_GROUND_B
+PAL_SKY_BASE = A.PAL_SKY_BASE
+BIRD_IDX = A.BIRD_IDX
 
 
 def decode(regs):
@@ -75,6 +80,7 @@ def decode(regs):
         "bird_frame": attr & 3, "bird_visible": bool(attr & 4), "bird_flash": bool(attr & 8),
         "pipes": pipes, "gap_h": cfg & 0x1FF, "pipe_w": (cfg >> 9) & 0x7F,
         "scroll": r(0x24) & 0x3FF,
+        "score": r(0x28) & 0xFFFF, "text_id": r(0x2C) & 0xF, "countdown": r(0x30) & 0xF,
         "palette": [((v >> 16) & 255, (v >> 8) & 255, v & 255)
                     for v in (r(0x40 + 4 * i) for i in range(16))],
     }
@@ -111,10 +117,35 @@ def pipe_index(f, x, y):
     return None
 
 
-def pixel(f, x, y):
+def text_lit(f, x, y):
+    """Apakah piksel (x, y) termasuk goresan teks (tanpa bayangan)."""
+    if f["text_id"] in (0, 5):
+        bcd = f["score"]
+        n = 4 if bcd >> 12 else 3 if bcd >> 8 else 2 if bcd >> 4 else 1
+        x0, y0 = 320 - 8 * n, A.SCORE_Y
+        cx, cy = x - x0, y - y0
+        if 0 <= cx < 16 * n and 0 <= cy < 32:
+            k = cx >> 4
+            digit = (bcd >> (4 * (n - 1 - k))) & 0xF
+            if digit <= 9 and A.font_bit(digit, (cx & 15) >> 1, cy >> 1):
+                return True
+    cd = f["countdown"]
+    if cd:
+        cx, cy = x - A.COUNT_X, y - A.COUNT_Y
+        if 0 <= cx < 32 and 0 <= cy < 64 and cd <= 9 and A.font_bit(cd, cx >> 2, cy >> 2):
+            return True
+    return False
+
+
+def pixel(f, x, y, text=True):
     pal = f["palette"]
     if not f["enable"]:
         return (0, 0, 0)
+    if text:
+        if text_lit(f, x, y):
+            return pal[A.PAL_TEXT]
+        if text_lit(f, x - A.SHADOW, y - A.SHADOW):
+            return pal[A.PAL_TEXT_SHADOW]
     bx, by = f["bird_x"], f["bird_y"]
     if f["bird_visible"] and bx <= x < bx + 32 and by <= y < by + 32:
         idx = BIRD_IDX[f["bird_frame"]][(y - by) >> 1][(x - bx) >> 1]
@@ -131,13 +162,14 @@ def pixel(f, x, y):
     return sky_rgb(y, pal[PAL_SKY_BASE])
 
 
-def render(regs):
-    """Kembalikan bytes RGB 640x480 (baris demi baris)."""
+def render(regs, text=True):
+    """Kembalikan bytes RGB 640x480 (baris demi baris). text=False melewati
+    layer teks (untuk dibandingkan dengan draw_world pygame yang tanpa teks)."""
     f = decode(regs)
     out = bytearray()
     for y in range(H):
         for x in range(W):
-            out += bytes(pixel(f, x, y))
+            out += bytes(pixel(f, x, y, text))
     return bytes(out)
 
 

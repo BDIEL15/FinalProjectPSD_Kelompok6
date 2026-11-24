@@ -1,6 +1,6 @@
 -- gfx_pkg.vhd -- tipe dan konstanta bersama akselerator grafis Jump-to-Flap.
 --
--- DRAF v1 (belum dikompilasi: GHDL/Vivado belum terpasang saat ditulis).
+-- v1. Dicek GHDL (sim/run_vhdl.ps1); sintesis Vivado belum.
 -- Pemilik: D. Disetujui: E. Sumber kebenaran register map:
 -- docs/tugas/README.md §3.1, sama dengan sw/game/regs.h dan tools/ref_render.py.
 --
@@ -87,4 +87,43 @@ package gfx_pkg is
         text_id      => (others => '0'),
         countdown    => (others => '0'),
         palette      => (others => (others => '0')));
+
+    -- Isi mentah 32 register (indeks = offset/4), sama dengan regs[] di C.
+    subtype word_t is std_logic_vector(31 downto 0);
+    type reg_words_t is array (0 to 31) of word_t;
+
+    -- Pecah word register menjadi field. Dipakai gfx_axi_regs (register aktif)
+    -- dan testbench renderer (membaca keluaran sw/game/game_regs).
+    function regs_decode(w : reg_words_t) return gfx_regs_t;
 end package;
+
+package body gfx_pkg is
+    function regs_decode(w : reg_words_t) return gfx_regs_t is
+        variable r : gfx_regs_t;
+        variable p : word_t;
+    begin
+        r.enable       := w(REG_CTRL / 4)(0);
+        r.test_pattern := w(REG_CTRL / 4)(1);
+        r.bird_x       := unsigned(w(REG_BIRD_POS / 4)(9 downto 0));
+        r.bird_y       := unsigned(w(REG_BIRD_POS / 4)(25 downto 16));
+        r.bird_frame   := unsigned(w(REG_BIRD_ATTR / 4)(1 downto 0));
+        r.bird_visible := w(REG_BIRD_ATTR / 4)(2);
+        r.bird_flash   := w(REG_BIRD_ATTR / 4)(3);
+        for i in 0 to PIPE_SLOTS - 1 loop
+            p := w(REG_PIPE0 / 4 + i);
+            r.pipes(i).x       := signed(p(10 downto 0));
+            r.pipes(i).gap_y   := unsigned(p(20 downto 12));
+            r.pipes(i).visible := p(31);
+        end loop;
+        r.gap_h      := unsigned(w(REG_PIPE_CFG / 4)(8 downto 0));
+        r.pipe_width := unsigned(w(REG_PIPE_CFG / 4)(15 downto 9));
+        r.scroll_x   := unsigned(w(REG_SCROLL_X / 4)(9 downto 0));
+        r.score_bcd  := w(REG_SCORE / 4)(15 downto 0);
+        r.text_id    := unsigned(w(REG_TEXT_ID / 4)(3 downto 0));
+        r.countdown  := unsigned(w(REG_COUNTDOWN / 4)(3 downto 0));
+        for i in 0 to 15 loop
+            r.palette(i) := w(REG_PALETTE0 / 4 + i)(23 downto 0);
+        end loop;
+        return r;
+    end function;
+end package body;

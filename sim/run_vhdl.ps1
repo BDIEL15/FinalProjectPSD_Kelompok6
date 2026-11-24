@@ -66,6 +66,10 @@ function Run-Bench($tb, [string[]]$generics = @()) {
     $out = & ghdl --elab-run @ghdl $tb @generics 2>&1 | ForEach-Object { "$_" }
     $out | Where-Object { $_ -match 'PASS|FAIL|ditulis|error' } |
         ForEach-Object { Write-Host ($_ -replace '^.*\(report \w+\):\s*', '') }
+    # Setiap [FAIL] / report error dari testbench menggagalkan seluruh skrip.
+    if ($out -match '\[FAIL\]|\(report error\)|\(assertion error\)|\(report failure\)') {
+        $script:fail = $true
+    }
     return $out
 }
 
