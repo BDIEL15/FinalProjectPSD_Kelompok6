@@ -31,7 +31,7 @@ Keduanya harus diakhiri `PASS`. Simulasi membuktikan logika dan gambar. Yang **t
 Perintah `vivado`, `vitis`, dan `xsdb` ada di folder `bin` Vivado/Vitis. Di PowerShell, atur PATH sekali per jendela (jangan klik file `.bat`/`.tcl` langsung; Windows akan menanyakan "buka dengan apa"):
 
 ```powershell
-$env:Path = "C:\AMDDesignTools6.1\Vivadoin;C:\AMDDesignTools6.1\Vitisin;$env:Path"
+$env:Path = "C:\AMDDesignTools\2026.1\Vivado\bin;C:\AMDDesignTools\2026.1\Vitis\bin;$env:Path"
 ```
 
 (`C:\AMDDesignTools` adalah lokasi instalasi di laptop kelompok; sesuaikan bila berbeda.)
